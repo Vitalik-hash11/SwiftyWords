@@ -11,9 +11,20 @@ class ViewController: UIViewController {
     
     private let scoreLabel = UILabel()
     private let answersLabel = UILabel()
-    private let currentAnswer = UITextField()
+    private var currentAnswer = UITextField()
     private let cluesLabel = UILabel()
     private var letterButtons = [UIButton]()
+    
+    private var score: Double = 0 {
+        didSet {
+            scoreLabel.text = "Score: \(score)"
+        }
+    }
+    private var level = 1
+    private var correctAnswers = 0
+    
+    private var solutions = [String]()
+    private var activatedButtons = [UIButton]()
     
     override func loadView() {
         view = UIView()
@@ -49,11 +60,13 @@ class ViewController: UIViewController {
         let submit = UIButton(type: .system)
         submit.setTitle("SUBMIT", for: .normal)
         submit.translatesAutoresizingMaskIntoConstraints = false
+        submit.addTarget(self, action: #selector(submitButtonPressed), for: .touchUpInside)
         view.addSubview(submit)
         
         let clear = UIButton(type: .system)
         clear.translatesAutoresizingMaskIntoConstraints = false
         clear.setTitle("CLEAR", for: .normal)
+        clear.addTarget(self, action: #selector(clearButtonPressed), for: .touchUpInside)
         view.addSubview(clear)
         
         let buttonsView = UIView()
@@ -73,6 +86,9 @@ class ViewController: UIViewController {
                 
                 let frame = CGRect(x: col * width, y: row * height, width: width, height: height)
                 letterButton.frame = frame
+                letterButton.addTarget(self, action: #selector(letterButtonPressed), for: .touchUpInside)
+                letterButton.layer.borderColor = UIColor.lightGray.cgColor
+                letterButton.layer.borderWidth = 1
                 
                 buttonsView.addSubview(letterButton)
                 letterButtons.append(letterButton)
@@ -109,9 +125,95 @@ class ViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
+        
+        loadLevel()
     }
 
+    @objc private func submitButtonPressed(_ sender: UIButton) {
+        guard let answer = currentAnswer.text else { return }
+        if let position = solutions.firstIndex(of: answer) {
+            guard let hints = answersLabel.text else { return }
+            var hintsArray = hints.components(separatedBy: "\n")
+            hintsArray[position] = answer
+            answersLabel.text = hintsArray.joined(separator: "\n")
+            currentAnswer.text = ""
+            
+            score += 1
+            correctAnswers += 1
+            
+            if correctAnswers % 7 == 0 {
+                let ac = UIAlertController(title: "Are you ready to the next level?", message: nil, preferredStyle: .alert)
+                ac.addAction(UIAlertAction(title: "Let's do it!", style: .default, handler: levelUp))
+                present(ac, animated: true)
+            }
+            activatedButtons.removeAll()
+        } else {
+            clearButtonPressed(sender)
+            score -= 0.5
+            let ac = UIAlertController(title: "You are wrong", message: nil, preferredStyle: .alert)
+            ac.addAction(UIAlertAction(title: "OK", style: .default))
+            present(ac, animated: true)
+        }
+    }
+    
+    @objc private func clearButtonPressed(_ sender: UIButton) {
+        currentAnswer.text = ""
+        for button in activatedButtons {
+            button.isHidden = false
+        }
+    }
+    
+    @objc private func letterButtonPressed(_ sender: UIButton) {
+        currentAnswer.text! += sender.titleLabel!.text!
+        activatedButtons.append(sender)
+        sender.isHidden = true
+    }
+    
+    private func loadLevel() {
+        var cluesString = ""
+        var answersString = ""
+        var bits = [String]()
+        
+        if let url = Bundle.main.url(forResource: "level\(level)", withExtension: "txt") {
+            if let levelContent = try? String(contentsOf: url) {
+                let lines = levelContent.components(separatedBy: "\n")
+                for (index, line) in lines.enumerated() {
+                    let parts = line.components(separatedBy: ": ")
+                    let clue = parts[1]
+                    let answer = parts[0]
+                    cluesString += "\(index+1). \(clue).\n"
+                    let solutionWord = answer.replacingOccurrences(of: "|", with: "")
+                    answersString += "\(solutionWord.count) letters\n"
+                    solutions.append(solutionWord)
+                    
+                    bits.append(contentsOf: answer.components(separatedBy: "|"))
+                }
+            }
+        }
+        
+        cluesLabel.text = cluesString.trimmingCharacters(in: .whitespacesAndNewlines)
+        answersLabel.text = answersString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        bits.shuffle()
+        
+        if bits.count == letterButtons.count {
+            for index in 0..<letterButtons.count {
+                letterButtons[index].setTitle(bits[index], for: .normal)
+            }
+        }
+    }
+    
+    private func levelUp(action: UIAlertAction) {
+        level += 1
+        score = 0
+        
+        solutions.removeAll()
+        loadLevel()
+        
+        for button in letterButtons {
+            button.isHidden = false
+        }
+    }
 
 }
 
