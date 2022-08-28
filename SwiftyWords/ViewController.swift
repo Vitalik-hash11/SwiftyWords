@@ -26,6 +26,9 @@ class ViewController: UIViewController {
     private var solutions = [String]()
     private var activatedButtons = [UIButton]()
     
+//    private var cluesString = ""
+//    private var answersString = ""
+    
     override func loadView() {
         view = UIView()
         view.backgroundColor = .white
@@ -170,35 +173,39 @@ class ViewController: UIViewController {
     }
     
     private func loadLevel() {
-        var cluesString = ""
-        var answersString = ""
-        var bits = [String]()
-        
-        if let url = Bundle.main.url(forResource: "level\(level)", withExtension: "txt") {
-            if let levelContent = try? String(contentsOf: url) {
-                let lines = levelContent.components(separatedBy: "\n")
-                for (index, line) in lines.enumerated() {
-                    let parts = line.components(separatedBy: ": ")
-                    let clue = parts[1]
-                    let answer = parts[0]
-                    cluesString += "\(index+1). \(clue).\n"
-                    let solutionWord = answer.replacingOccurrences(of: "|", with: "")
-                    answersString += "\(solutionWord.count) letters\n"
-                    solutions.append(solutionWord)
-                    
-                    bits.append(contentsOf: answer.components(separatedBy: "|"))
+        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            var bits = [String]()
+            var cluesString = ""
+            var answersString = ""
+            
+            if let url = Bundle.main.url(forResource: "level\((self?.level)!)", withExtension: "txt") {
+                if let levelContent = try? String(contentsOf: url) {
+                    let lines = levelContent.components(separatedBy: "\n")
+                    for (index, line) in lines.enumerated() {
+                        let parts = line.components(separatedBy: ": ")
+                        let clue = parts[1]
+                        let answer = parts[0]
+                        cluesString += "\(index+1). \(clue).\n"
+                        let solutionWord = answer.replacingOccurrences(of: "|", with: "")
+                        answersString += "\(solutionWord.count) letters\n"
+                        self?.solutions.append(solutionWord)
+                        
+                        bits.append(contentsOf: answer.components(separatedBy: "|"))
+                    }
                 }
             }
-        }
-        
-        cluesLabel.text = cluesString.trimmingCharacters(in: .whitespacesAndNewlines)
-        answersLabel.text = answersString.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        bits.shuffle()
-        
-        if bits.count == letterButtons.count {
-            for index in 0..<letterButtons.count {
-                letterButtons[index].setTitle(bits[index], for: .normal)
+            
+            DispatchQueue.main.async { [weak self] in
+                self?.cluesLabel.text = cluesString.trimmingCharacters(in: .whitespacesAndNewlines)
+                self?.answersLabel.text = answersString.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                bits.shuffle()
+                
+                if bits.count == self?.letterButtons.count {
+                    for index in 0..<(self?.letterButtons.count)! {
+                        self?.letterButtons[index].setTitle(bits[index], for: .normal)
+                    }
+                }
             }
         }
     }
